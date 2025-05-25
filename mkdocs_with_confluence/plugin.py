@@ -1,20 +1,24 @@
 import time
+from time import sleep
+
 import os
+from os import environ
+
+import contextlib
 import hashlib
+from pathlib import Path
+
+import mimetypes
 import sys
 import re
 import tempfile
 import shutil
 import requests
-import mimetypes
 import mistune
-import contextlib
-from time import sleep
+
 from mkdocs.config import config_options
 from mkdocs.plugins import BasePlugin
 from md2cf.confluence_renderer import ConfluenceRenderer
-from os import environ
-from pathlib import Path
 
 TEMPLATE_BODY = "<p> TEMPLATE </p>"
 
@@ -28,7 +32,7 @@ def nostdout():
 
 
 class DummyFile(object):
-    def write(self, x):
+    def write(self, x) -> None:
         pass
 
 
@@ -56,7 +60,9 @@ class MkdocsWithConfluence(BasePlugin):
         self.session = requests.Session()
         self.page_attachments = {}
 
-    def on_nav(self, nav, config, files):
+    #SECTION - EVENT LISTENERS
+
+    def on_nav(self, nav, config, files) -> None:
         MkdocsWithConfluence.tab_nav = []
         navigation_items = nav.__repr__()
 
@@ -97,7 +103,7 @@ class MkdocsWithConfluence(BasePlugin):
                 s = spaces + self.section_title
                 MkdocsWithConfluence.tab_nav.append(s)
 
-    def on_files(self, files, config):
+    def on_files(self, files, config) -> None:
         pages = files.documentation_pages()
         try:
             self.flen = len(pages)
@@ -105,7 +111,7 @@ class MkdocsWithConfluence(BasePlugin):
         except 0:
             print("ERR: You have no documentation pages" "in the directory tree, please add at least one!")
 
-    def on_post_template(self, output_content, template_name, config):
+    def on_post_template(self, output_content, template_name, config) -> None:
         if self.config["verbose"] is False and self.config["debug"] is False:
             self.simple_log = True
             print("INFO    -  Mkdocs With Confluence: Start exporting markdown pages... (simple logging)")
@@ -155,9 +161,9 @@ class MkdocsWithConfluence(BasePlugin):
         if self.enabled:
             if self.simple_log is True:
                 print("INFO    - Mkdocs With Confluence: Page export progress: [", end="", flush=True)
-                for i in range(MkdocsWithConfluence._id):
+                for _ in range(MkdocsWithConfluence._id):
                     print("#", end="", flush=True)
-                for j in range(self.flen - MkdocsWithConfluence._id):
+                for _ in range(self.flen - MkdocsWithConfluence._id):
                     print("-", end="", flush=True)
                 print(f"] ({MkdocsWithConfluence._id} / {self.flen})", end="\r", flush=True)
 
@@ -368,6 +374,10 @@ class MkdocsWithConfluence(BasePlugin):
 
     def on_page_content(self, html, page, config, files):
         return html
+    
+    #&SECTION - EVENT LISTENERS END
+
+    #SECTION - GETTERS
 
     def __get_page_url(self, section):
         return re.search("url='(.*)'\\)", section).group(1)[:-1] + ".md"
@@ -407,8 +417,12 @@ class MkdocsWithConfluence(BasePlugin):
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_sha1.update(chunk)
         return hash_sha1.hexdigest()
+    
+    #&SECTION - GETTERS END
 
-    def add_or_update_attachment(self, page_name, filepath):
+    #SECTION - PAGE & ATTACHMENT REQUESTS
+
+    def add_or_update_attachment(self, page_name, filepath) -> None:
         print(f"INFO    - Mkdocs With Confluence * {page_name} *ADD/Update ATTACHMENT if required* {filepath}")
         if self.config["debug"]:
             print(f" * Mkdocs With Confluence: Add Attachment: PAGE NAME: {page_name}, FILE: {filepath}")
@@ -448,7 +462,7 @@ class MkdocsWithConfluence(BasePlugin):
         if response_json["size"]:
             return response_json["results"][0]
 
-    def update_attachment(self, page_id, filepath, existing_attachment, message):
+    def update_attachment(self, page_id, filepath, existing_attachment, message) -> None:
         if self.config["debug"]:
             print(f" * Mkdocs With Confluence: Update Attachment: PAGE ID: {page_id}, FILE: {filepath}")
 
@@ -475,7 +489,7 @@ class MkdocsWithConfluence(BasePlugin):
             else:
                 print("ERR!")
 
-    def create_attachment(self, page_id, filepath, message):
+    def create_attachment(self, page_id, filepath, message) -> None:
         if self.config["debug"]:
             print(f" * Mkdocs With Confluence: Create Attachment: PAGE ID: {page_id}, FILE: {filepath}")
 
@@ -521,7 +535,7 @@ class MkdocsWithConfluence(BasePlugin):
                 print("PAGE DOES NOT EXIST")
             return None
 
-    def add_page(self, page_name, parent_page_id, page_content_in_storage_format):
+    def add_page(self, page_name, parent_page_id, page_content_in_storage_format) -> None:
         print(f"INFO    -   * Mkdocs With Confluence: {page_name} - *NEW PAGE*")
 
         if self.config["debug"]:
@@ -550,7 +564,7 @@ class MkdocsWithConfluence(BasePlugin):
                 if self.config["debug"]:
                     print("ERR!")
 
-    def update_page(self, page_name, page_content_in_storage_format):
+    def update_page(self, page_name, page_content_in_storage_format) -> None:
         page_id = self.find_page_id(page_name)
         print(f"INFO    -   * Mkdocs With Confluence: {page_name} - *UPDATE*")
         if self.config["debug"]:
@@ -584,6 +598,10 @@ class MkdocsWithConfluence(BasePlugin):
         else:
             if self.config["debug"]:
                 print("PAGE DOES NOT EXIST YET!")
+
+    #&SECTION _ PAGE & ATTACHMENT REQUESTS END
+
+    #SECTION - DATA RETRIEVAL
 
     def find_page_version(self, page_name):
         if self.config["debug"]:
@@ -622,7 +640,9 @@ class MkdocsWithConfluence(BasePlugin):
                 print("PAGE DOES NOT HAVE PARENT")
             return None
 
-    def wait_until(self, condition, interval=0.1, timeout=1):
+    #&SECTION - DATA RETRIEVAL END
+
+    def wait_until(self, condition, interval=0.1, timeout=1) -> None:
         start = time.time()
         while not condition and time.time() - start < timeout:
             time.sleep(interval)
