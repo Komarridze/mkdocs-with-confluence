@@ -31,8 +31,8 @@ Use following config and adjust it according to your needs:
 
 ```yaml
   - mkdocs-with-confluence:
-        host_url: https://<YOUR_CONFLUENCE_DOMAIN> 
-        # (eg. 'xxxxxx.atlassian.net/wiki')/rest/api/content
+        host_url: https://<YOUR_CONFLUENCE_DOMAIN>/rest/api/content
+        # (eg. 'xxxxxx.atlassian.net/wiki/rest/api/content')
         space: <YOUR_SPACE> 
         # (eg. '~812020d7066fbfb5510e8e8756a14d5468abd9')
         parent_page_name: <YOUR_ROOT_PARENT_PAGE> 
