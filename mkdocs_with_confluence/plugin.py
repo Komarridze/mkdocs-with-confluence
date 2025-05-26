@@ -1,3 +1,5 @@
+"MKDOCS-WITH-CONFLUENCE MAIN FILEPOINT"
+
 import time
 from time import sleep
 
@@ -22,6 +24,16 @@ from md2cf.confluence_renderer import ConfluenceRenderer
 
 TEMPLATE_BODY = "<p> TEMPLATE </p>"
 
+# pylint: disable=missing-docstring
+# pylint: disable=attribute-defined-outside-init
+# pylint: disable=no-else-return
+# pylint: disable=arguments-differ
+# pylint: disable=too-many-instance-attributes
+# pylint: disable=too-many-branches
+# pylint: disable=too-many-statements
+# pylint: disable=too-many-locals
+# pylint: disable=line-too-long
+
 
 @contextlib.contextmanager
 def nostdout():
@@ -31,7 +43,7 @@ def nostdout():
     sys.stdout = save_stdout
 
 
-class DummyFile(object):
+class DummyFile():
     def write(self, x) -> None:
         pass
 
@@ -43,7 +55,7 @@ class MkdocsWithConfluence(BasePlugin):
         ("space", config_options.Type(str, default=None)),
         ("parent_page_name", config_options.Type(str, default=None)),
         ("username", config_options.Type(str, default=environ.get("JIRA_USERNAME", None))),
-        ("api_token", config_options.Type(str, default=environ.get("CONFLUENCE_API_TOKEN", None))), # If specified, password is ignored
+        ("api_token", config_options.Type(str, default=environ.get("CONFLUENCE_API_TOKEN", None))),  # If specified, password is ignored
         ("password", config_options.Type(str, default=environ.get("JIRA_PASSWORD", None))),
         ("enabled_if_env", config_options.Type(str, default=None)),
         ("verbose", config_options.Type(bool, default=False)),
@@ -60,11 +72,11 @@ class MkdocsWithConfluence(BasePlugin):
         self.session = requests.Session()
         self.page_attachments = {}
 
-    #SECTION - EVENT LISTENERS
+    # SECTION - EVENT LISTENERS
 
     def on_nav(self, nav, config, files) -> None:
         MkdocsWithConfluence.tab_nav = []
-        navigation_items = nav.__repr__()
+        navigation_items = repr(nav)
 
         for n in navigation_items.split("\n"):
             leading_spaces = len(n) - len(n.lstrip(" "))
@@ -108,8 +120,8 @@ class MkdocsWithConfluence(BasePlugin):
         try:
             self.flen = len(pages)
             print(f"Number of Files in directory tree: {self.flen}")
-        except 0:
-            print("ERR: You have no documentation pages" "in the directory tree, please add at least one!")
+        except TypeError:
+            print("ERR: You have no documentation pages " + "in the directory tree, please add at least one!")
 
     def on_post_template(self, output_content, template_name, config) -> None:
         if self.config["verbose"] is False and self.config["debug"] is False:
@@ -125,7 +137,7 @@ class MkdocsWithConfluence(BasePlugin):
                 self.enabled = os.environ.get(env_name) == "1"
                 if not self.enabled:
                     print(
-                        "WARNING - Mkdocs With Confluence: Exporting MKDOCS pages to Confluence turned OFF: "
+                        "WARNING - Mkdocs With Confluence: Exporting MKDOCS pages to Confluence turned OFF: " +
                         f"(set environment variable {env_name} to 1 to enable)"
                     )
                     return
@@ -178,7 +190,7 @@ class MkdocsWithConfluence(BasePlugin):
                     print("DEBUG    - Get section first parent title...: ")
                 try:
 
-                    parent = self.__get_section_title(page.ancestors[0].__repr__())
+                    parent = self.__get_section_title(repr(page.ancestors[0]))
                 except IndexError as e:
                     if self.config["debug"]:
                         print(
@@ -199,7 +211,7 @@ class MkdocsWithConfluence(BasePlugin):
                 if self.config["debug"]:
                     print("DEBUG    - Get section second parent title...: ")
                 try:
-                    parent1 = self.__get_section_title(page.ancestors[1].__repr__())
+                    parent1 = self.__get_section_title(repr(page.ancestors[1]))
                 except IndexError as e:
                     if self.config["debug"]:
                         print(
@@ -222,37 +234,35 @@ class MkdocsWithConfluence(BasePlugin):
                     print(f"DEBUG    - PARENT0: {parent}, PARENT1: {parent1}, MAIN PARENT: {main_parent}")
 
                 tf = tempfile.NamedTemporaryFile(delete=False)
-                f = open(tf.name, "w")
+                with open(tf.name, "w", encoding="utf-8") as f:
+                    attachments = []
+                    try:
+                        for match in re.finditer(r'img src="file://(.*)" s', markdown):
+                            if self.config["debug"]:
+                                print(f"DEBUG    - FOUND IMAGE: {match.group(1)}")
+                            attachments.append(match.group(1))
+                        for match in re.finditer(r"!\[[\w\. -]*\]\((?!http|file)([^\s,]*).*\)", markdown):
+                            file_path = match.group(1).lstrip("./\\")
+                            attachments.append(file_path)
 
-                attachments = []
-                try:
-                    for match in re.finditer(r'img src="file://(.*)" s', markdown):
+                            if self.config["debug"]:
+                                print(f"DEBUG    - FOUND IMAGE: {file_path}")
+                            attachments.append("docs/" + file_path.replace("../", ""))
+
+                    except AttributeError as e:
                         if self.config["debug"]:
-                            print(f"DEBUG    - FOUND IMAGE: {match.group(1)}")
-                        attachments.append(match.group(1))
-                    for match in re.finditer(r"!\[[\w\. -]*\]\((?!http|file)([^\s,]*).*\)", markdown):
-                        file_path = match.group(1).lstrip("./\\")
-                        attachments.append(file_path)
-
-                        if self.config["debug"]:
-                            print(f"DEBUG    - FOUND IMAGE: {file_path}")
-                        attachments.append("docs/" + file_path.replace("../", ""))
-
-                except AttributeError as e:
+                            print(f"DEBUG    - WARN(({e}): No images found in markdown. Proceed..")
+                    new_markdown = re.sub(
+                        r'<img src="file:///tmp/', '<p><ac:image ac:height="350"><ri:attachment ri:filename="', markdown
+                    )
+                    new_markdown = re.sub(r'" style="page-break-inside: avoid;">', '"/></ac:image></p>', new_markdown)
+                    confluence_body = self.confluence_mistune(new_markdown)
+                    f.write(confluence_body)
                     if self.config["debug"]:
-                        print(f"DEBUG    - WARN(({e}): No images found in markdown. Proceed..")
-                new_markdown = re.sub(
-                    r'<img src="file:///tmp/', '<p><ac:image ac:height="350"><ri:attachment ri:filename="', markdown
-                )
-                new_markdown = re.sub(r'" style="page-break-inside: avoid;">', '"/></ac:image></p>', new_markdown)
-                confluence_body = self.confluence_mistune(new_markdown)
-                f.write(confluence_body)
-                if self.config["debug"]:
-                    print(confluence_body)
-                page_name = page.title
-                new_name = "confluence_page_" + page_name.replace(" ", "_") + ".html"
-                shutil.copy(f.name, new_name)
-                f.close()
+                        print(confluence_body)
+                    page_name = page.title
+                    new_name = "confluence_page_" + page_name.replace(" ", "_") + ".html"
+                    shutil.copy(f.name, new_name)
 
                 if self.config["debug"]:
                     print(
@@ -374,10 +384,10 @@ class MkdocsWithConfluence(BasePlugin):
 
     def on_page_content(self, html, page, config, files):
         return html
-    
-    #&SECTION - EVENT LISTENERS END
 
-    #SECTION - GETTERS
+    # &SECTION - EVENT LISTENERS END
+
+    # SECTION - GETTERS
 
     def __get_page_url(self, section):
         return re.search("url='(.*)'\\)", section).group(1)[:-1] + ".md"
@@ -417,10 +427,10 @@ class MkdocsWithConfluence(BasePlugin):
             for chunk in iter(lambda: f.read(4096), b""):
                 hash_sha1.update(chunk)
         return hash_sha1.hexdigest()
-    
-    #&SECTION - GETTERS END
 
-    #SECTION - PAGE & ATTACHMENT REQUESTS
+    # &SECTION - GETTERS END
+
+    # SECTION - PAGE & ATTACHMENT REQUESTS
 
     def add_or_update_attachment(self, page_name, filepath) -> None:
         print(f"INFO    - Mkdocs With Confluence * {page_name} *ADD/Update ATTACHMENT if required* {filepath}")
@@ -599,9 +609,9 @@ class MkdocsWithConfluence(BasePlugin):
             if self.config["debug"]:
                 print("PAGE DOES NOT EXIST YET!")
 
-    #&SECTION _ PAGE & ATTACHMENT REQUESTS END
+    # &SECTION - PAGE & ATTACHMENT REQUESTS END
 
-    #SECTION - DATA RETRIEVAL
+    # SECTION - DATA RETRIEVAL
 
     def find_page_version(self, page_name):
         if self.config["debug"]:
@@ -640,7 +650,7 @@ class MkdocsWithConfluence(BasePlugin):
                 print("PAGE DOES NOT HAVE PARENT")
             return None
 
-    #&SECTION - DATA RETRIEVAL END
+    # &SECTION - DATA RETRIEVAL END
 
     def wait_until(self, condition, interval=0.1, timeout=1) -> None:
         start = time.time()
